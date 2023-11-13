@@ -1,12 +1,8 @@
 
-### Chapter 5 : Implementing NLP
+### TCC - Análise de Sentimentos de textos
 
-In this chapter, you will learn how to develop NLP applications using DL4J.
+Nesse projeto faço o treinamento de modelos de aprendizado de máquina utilizando a biblioteca Deeplearning4j, em Java.
 &nbsp;
 &nbsp;
 
-#### Instructions 
-
- - Navigate to **sourceCode/cookbookapp** directory and import the project using *pom.xml* file.
- - All the examples for chapter 5 are included in **cookbookapp** project.
- - Datasets can be located in *resources* directory apart from the ones that need to be downloaded. For more clarifications, refer to the cookbook instructions.  
+#### Ainda estou testando, não concluí o desenvolvimento
