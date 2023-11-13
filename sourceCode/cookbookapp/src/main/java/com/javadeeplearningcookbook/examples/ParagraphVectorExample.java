@@ -34,9 +34,10 @@ public class ParagraphVectorExample {
     //Ele cria um criador de logs para esta classe, que pode ser usado para gerar mensagens de log.
     private static Logger log = LoggerFactory.getLogger(ParagraphVectorExample.class);
 
-    public static final String PATH_RESOURCES  = "D:/Edmilton/tcc/tcc_atual - classificacao_emocoes/paragraphvectors/05_Implementing_NLP - Testando alterações/sourceCode/cookbookapp/src/main/resources";
-    public static final String RESOURCE_TESTE = PATH_RESOURCES + "/teste";
-    public static final String RESOURCE_TREINO = PATH_RESOURCES + "/treino";
+    public static final String PATH_RESOURCES  = "D:/Edmilton/tcc/tcc_atual - classificacao_emocoes/paragraphvectors/nlp_analise_sentimentos/sourceCode/cookbookapp/src/main/resources";
+    public static final String RESOURCE_TESTE = PATH_RESOURCES + "/teste/file";
+    public static final String RESOURCE_TREINO_SAD = PATH_RESOURCES + "/treino/sad";
+    public static final String RESOURCE_TREINO_HAPPY = PATH_RESOURCES + "/treino/happy";
 
     public static void main(String[] args) throws IOException {
 
@@ -68,6 +69,12 @@ public class ParagraphVectorExample {
             documents.add(labelAwareIterator.nextDocument());
         }
 
+        File diretorioTeste = new File(RESOURCE_TESTE);
+        File diretorioTreinoSad = new File(RESOURCE_TREINO_SAD);
+        File diretorioTreinoHappy = new File(RESOURCE_TREINO_HAPPY);
+
+        List<String> listaArquivosTestados = new ArrayList<>();
+
         //Depois de copiar os arquivos e separá-los em novos diretórios,
         //é necessário criar outro iterator apenas do novo diretório de arquivo de treino
 
@@ -81,19 +88,19 @@ public class ParagraphVectorExample {
                treino -> n1, n2, n3
             */
 
-            File diretorioTeste = new File(RESOURCE_TESTE);
-            File diretorioTreino = new File(RESOURCE_TREINO);
-
-            List<String> listaArquivosTestados = new ArrayList<>();
-
             File[] arquivosTeste = diretorioTeste.listFiles(); //possiveis arquivos na pasta /resources/teste
-            File[] arquivosTreino = diretorioTreino.listFiles(); //possiveis arquivos na pasta /resources/treino
+            File[] arquivosTreinoSad = diretorioTreinoSad.listFiles(); //possiveis arquivos na pasta /resources/treino/sad
+            File[] arquivosTreinoHappy = diretorioTreinoHappy.listFiles(); //possiveis arquivos na pasta /resources/treino/happy
             if(arquivosTeste.length > 0) {
                 for(File file : arquivosTeste) file.delete(); //deixando a pasta /teste vazia para uma nova iteração,
             }                                                 //porque deve ser testado apenas um arquivo por vez
 
-            if(arquivosTreino.length > 0) {
-                for(File file : arquivosTreino) file.delete();
+            if(arquivosTreinoSad.length > 0) {
+                for(File file : arquivosTreinoSad) file.delete();
+            }
+
+            if(arquivosTreinoHappy.length > 0) {
+                for(File file : arquivosTreinoHappy) file.delete();
             }
 
             for(int j = 0; j < documents.size(); j++){
@@ -109,8 +116,13 @@ public class ParagraphVectorExample {
                     listaArquivosTestados.add(arquivoTeste.getName());
                     criaArquivo(documents.get(j), arquivoTeste);
                 } else {
-                    File arquivoTreino = new File(diretorioTreino, nomeArquivoTreino);
-                    criaArquivo(documents.get(j), arquivoTreino);
+                    if (documents.get(j).getLabels().get(0).equals("sad")){
+                        File arquivoTreino = new File(diretorioTreinoSad, nomeArquivoTreino);
+                        criaArquivo(documents.get(j), arquivoTreino);
+                    } else {
+                        File arquivoTreino = new File(diretorioTreinoHappy, nomeArquivoTreino);
+                        criaArquivo(documents.get(j), arquivoTreino);
+                    }
                 }
 
             }
@@ -121,7 +133,7 @@ public class ParagraphVectorExample {
             int falseNegatives = 0; //previu incorretamente como sad
 
             // 1 - Criar dois map<chave,valor> para armazenar <identificador, label> dos arquivos de treino e de teste
-            Map<Integer, String> mapTrain = new HashMap<Integer, String>();
+            Map<Integer, String> mapReal = new HashMap<Integer, String>();
             Map<Integer, String> mapTest = new HashMap<Integer, String>();
             List<Integer> idsUnlabelledDocument = new ArrayList<>();
             List<Integer> idsLabelledDocument = new ArrayList<>();
@@ -132,22 +144,21 @@ public class ParagraphVectorExample {
 
             //Aqui, um `LabelAwareIterator` é criado para ler documentos do diretório teste e treino, dentro do diretório resource
             ClassPathResource testeResource = new ClassPathResource("teste");
-            LabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
-                    .addSourceFolder(classifiedResource.getFile())
+            FileLabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
+                    .addSourceFolder(testeResource.getFile())
                     .build();
 
             ClassPathResource treinoResource = new ClassPathResource("treino");
-            LabelAwareIterator treinoIterator = new FileLabelAwareIterator.Builder()
-                    .addSourceFolder(classifiedResource.getFile())
+            FileLabelAwareIterator treinoIterator = new FileLabelAwareIterator.Builder()
+                    .addSourceFolder(treinoResource.getFile())
                     .build();
 
-            //Preenchendo o mapTrain
-            while (treinoIterator.hasNextDocument()){
-                LabelledDocument labelledDocument = treinoIterator.nextDocument();
-                Integer id = labelledDocument.getContent().length();
-                String label = labelledDocument.getLabel();
+            //Preenchendo o mapReal
+            for (LabelledDocument real : documents){
+                Integer id = real.getContent().length();
+                String label = real.getLabel();
 
-                mapTrain.put(id, label);
+                mapReal.put(id, label);
                 idsLabelledDocument.add(id);
             }
 
@@ -163,7 +174,7 @@ public class ParagraphVectorExample {
                     .learningRate(0.050)
                     .minLearningRate(0.005)
                     .batchSize(1000)
-                    .epochs(2000)
+                    .epochs(5)
                     .iterate(treinoIterator)
                     .trainWordVectors(true)
                     .tokenizerFactory(tokenizerFactory)
@@ -211,7 +222,7 @@ public class ParagraphVectorExample {
                 //O `documentVector` é calculado como a média de todos os vetores de palavras no documento.
                 INDArray documentVector = allWords.mean(0);
 
-                List<String> labels = labelAwareIterator.getLabelsSource().getLabels();
+                List<String> labels = treinoIterator.getLabelsSource().getLabels();
 
                 //Esta parte calcula a similaridade de cosseno entre o vetor de documento e os vetores de rótulo para cada rótulo possível.
                 List<Pair<String, Double>> result = new ArrayList<>();
@@ -254,15 +265,15 @@ public class ParagraphVectorExample {
 
             for (int k = 0; k < mapTest.size(); k++){
                 //Aqui preciso ver se há os documentos do mapTest
-                //no mapTrain, e se forem correspondentes, comparar o label
-                if(mapTrain.containsKey(idsUnlabelledDocument.get(k))){
-                    String labelTrain = mapTrain.get(idsUnlabelledDocument.get(k));
+                //no mapReal, e se forem correspondentes, comparar o label
+                if(mapReal.containsKey(idsUnlabelledDocument.get(k))){
+                    String labelReal = mapReal.get(idsUnlabelledDocument.get(k));
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
 
-                    if(labelTrain.equals("happy") && labelTest.equals("happy")) truePositives++;
-                    else if(labelTrain.equals("happy") && labelTest.equals("sad")) falsePositives++;
-                    else if(labelTrain.equals("sad") && labelTest.equals("sad")) trueNegatives++;
-                    else if(labelTrain.equals("sad") && labelTest.equals("happy")) falseNegatives++;
+                    if(labelReal.equals("happy") && labelTest.equals("happy")) truePositives++;
+                    else if(labelReal.equals("happy") && labelTest.equals("sad")) falsePositives++;
+                    else if(labelReal.equals("sad") && labelTest.equals("sad")) trueNegatives++;
+                    else if(labelReal.equals("sad") && labelTest.equals("happy")) falseNegatives++;
                 }
             }
 
@@ -283,7 +294,7 @@ public class ParagraphVectorExample {
             writer.write(content); //Escrevendo o texto no arquivo txt
             writer.close();
             file.createNewFile(); //Criando o arquivo no sistema
-            System.out.println("Arquivo criado com sucesso.");
+            System.out.println("Arquivo " + file.getName() + " criado com sucesso.");
         } catch (IOException e){
             e.printStackTrace();
         }
