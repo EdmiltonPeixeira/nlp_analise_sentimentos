@@ -42,9 +42,10 @@ public class ParagraphVectorExample {
     public static void main(String[] args) throws IOException {
 
         //Iterator modificado
-        ClassPathResource classifiedResource = new ClassPathResource("label");
+        //ClassPathResource classifiedResource = new ClassPathResource("label");
+        //tentar passar a pasta label como file no .addSourceFolder abaixo
         LabelAwareIterator labelAwareIterator = new FileLabelAwareIterator.Builder()
-                .addSourceFolder(classifiedResource.getFile())
+                .addSourceFolder(new File(PATH_RESOURCES + "/label"))
                 .build();
 
         //Sendo k = 4 ou k = 10, utilizar apenas um arquivo para teste
@@ -143,14 +144,14 @@ public class ParagraphVectorExample {
             // 3 - Comparar o map de treino com o de teste e incrementar elementos da matriz de confusão
 
             //Aqui, um `LabelAwareIterator` é criado para ler documentos do diretório teste e treino, dentro do diretório resource
-            ClassPathResource testeResource = new ClassPathResource("teste");
+            //ClassPathResource testeResource = new ClassPathResource("teste");
             FileLabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
-                    .addSourceFolder(testeResource.getFile())
+                    .addSourceFolder(new File(PATH_RESOURCES + "/teste"))
                     .build();
 
-            ClassPathResource treinoResource = new ClassPathResource("treino");
+            //ClassPathResource treinoResource = new ClassPathResource("treino");
             FileLabelAwareIterator treinoIterator = new FileLabelAwareIterator.Builder()
-                    .addSourceFolder(treinoResource.getFile())
+                    .addSourceFolder(new File(PATH_RESOURCES + "/treino"))
                     .build();
 
             //Preenchendo o mapReal
@@ -200,7 +201,7 @@ public class ParagraphVectorExample {
                 LabelledDocument unlabelledDocument = testeIterator.nextDocument();
                 List<String> documentAsTokens = tokenizerFactory.create(unlabelledDocument.getContent()).getTokens();
 
-                idsUnlabelledDocument.add(unlabelledDocument.getContent().length());
+                idsUnlabelledDocument.add(unlabelledDocument.getContent().length()-1);
 
                 //O código abaixo conta os tokens que existem no vocabulário de `lookupTable`.
                 VocabCache vocabCache = lookupTable.getVocab();
@@ -239,9 +240,9 @@ public class ParagraphVectorExample {
                 //E criar uma iteração na lista 'result'
                 //para verificar qual label de maior score do documento e atribuir ao mapTest
                 if(result.get(0).getSecond() > result.get(1).getSecond()){
-                    mapTest.put(unlabelledDocument.getContent().length(), result.get(0).getFirst());
+                    mapTest.put(unlabelledDocument.getContent().length()-1, result.get(0).getFirst());
                 } else {
-                    mapTest.put(unlabelledDocument.getContent().length(), result.get(1).getFirst());
+                    mapTest.put(unlabelledDocument.getContent().length()-1, result.get(1).getFirst());
                 }
 
             /*  SIMILARIDADE DO COSSENO
