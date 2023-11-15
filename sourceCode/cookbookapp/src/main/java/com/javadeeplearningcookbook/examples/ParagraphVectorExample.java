@@ -1,6 +1,8 @@
 package com.javadeeplearningcookbook.examples;
 
+import org.apache.arrow.flatbuf.Bool;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
+import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
 import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.wordstore.VocabCache;
@@ -23,10 +25,10 @@ import java.awt.*;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ParagraphVectorExample {
@@ -40,6 +42,18 @@ public class ParagraphVectorExample {
     public static final String RESOURCE_TREINO_HAPPY = PATH_RESOURCES + "/treino/happy";
 
     public static void main(String[] args) throws IOException {
+
+        //declarar os elementos da matriz de confusão
+        //no início da classe principal, para gerar assim apenas
+        //uma matriz de confusão, que seria a soma da matriz de cada iteração k,
+        //e também permitir o cálculo de acurácia, tpRate...
+        //porque atualmente está sendo gerada uma matriz a cada iteração k
+        int truePositives = 0; //previu corretamente como happy
+        int falsePositives = 0; //previu incorretamente como happy
+        int trueNegatives = 0; //previu corretamente como sad
+        int falseNegatives = 0; //previu incorretamente como sad
+
+        AssessmentMetrics metrics = new AssessmentMetrics();
 
         //Iterator modificado
         //ClassPathResource classifiedResource = new ClassPathResource("label");
@@ -80,15 +94,6 @@ public class ParagraphVectorExample {
         //é necessário criar outro iterator apenas do novo diretório de arquivo de treino
 
         for(int i = 0; i < documents.size(); i++){
-            /* happy - 1 - positive
-               sad - 0 - negative
-
-               k = 4 -> [n0, n1, n2, n3]
-               iteração 1:
-               teste  -> n0
-               treino -> n1, n2, n3
-            */
-
             File[] arquivosTeste = diretorioTeste.listFiles(); //possiveis arquivos na pasta /resources/teste
             File[] arquivosTreinoSad = diretorioTreinoSad.listFiles(); //possiveis arquivos na pasta /resources/treino/sad
             File[] arquivosTreinoHappy = diretorioTreinoHappy.listFiles(); //possiveis arquivos na pasta /resources/treino/happy
@@ -125,13 +130,7 @@ public class ParagraphVectorExample {
                         criaArquivo(documents.get(j), arquivoTreino);
                     }
                 }
-
             }
-
-            int truePositives = 0; //previu corretamente como happy
-            int falsePositives = 0; //previu incorretamente como happy
-            int trueNegatives = 0; //previu corretamente como sad
-            int falseNegatives = 0; //previu incorretamente como sad
 
             // 1 - Criar dois map<chave,valor> para armazenar <identificador, label> dos arquivos de treino e de teste
             Map<Integer, String> mapReal = new HashMap<Integer, String>();
@@ -168,27 +167,19 @@ public class ParagraphVectorExample {
             TokenizerFactory tokenizerFactory = new DefaultTokenizerFactory();
             tokenizerFactory.setTokenPreProcessor(new CommonPreprocessor());
 
-
             //Nestas linhas, um modelo `ParagraphVectors` é construído. É configurado com vários parâmetros, como taxa de aprendizagem,
             //tamanho do lote e o número de épocas de treinamento. Ele é treinado usando `labelAwareIterator` e `tokenizerFactory` que você criou anteriormente.
             ParagraphVectors paragraphVectors = new ParagraphVectors.Builder()
-                    .learningRate(0.050)
-                    .minLearningRate(0.005)
-                    .batchSize(1000)
-                    .epochs(5)
-                    .iterate(treinoIterator)
-                    .trainWordVectors(true)
-                    .tokenizerFactory(tokenizerFactory)
-                    .build();
+                        .learningRate(0.025)
+                        .minLearningRate(0.001)
+                        .batchSize(1000)
+                        .epochs(100)
+                        .iterate(treinoIterator)
+                        .trainWordVectors(true)
+                        .tokenizerFactory(tokenizerFactory)
+                        .build();
+
             paragraphVectors.fit();
-
-            //Aqui, um novo `LabelAwareIterator` é criado para documentos não rotulados de uma pasta de origem especificada como "não rotulada".
-            //ATUALIZANDO: o iterator de arquivo de teste já foi criado acima
-
-            /*ClassPathResource unClassifiedResource = new ClassPathResource("unlabeled");
-            FileLabelAwareIterator unClassifiedIterator = new FileLabelAwareIterator.Builder()
-                    .addSourceFolder(unClassifiedResource.getFile())
-                    .build();*/
 
             //O `InMemoryLookupTable` é recuperado do modelo `paragraphVectors`. Esta tabela contém incorporações de palavras aprendidas durante o treinamento.
             InMemoryLookupTable<VocabWord> lookupTable = (InMemoryLookupTable<VocabWord>)paragraphVectors.getLookupTable();
@@ -245,23 +236,6 @@ public class ParagraphVectorExample {
                     mapTest.put(unlabelledDocument.getContent().length()-1, result.get(1).getFirst());
                 }
 
-            /*  SIMILARIDADE DO COSSENO
-                A similaridade do cosseno é a similaridade entre dois vetores diferentes de zero medido pelo cosseno
-            do ângulo entre eles. Essa métrica mede a orientação em vez da magnitude porque a similaridade
-            de cosseno calcula o ângulo entre os vetores do documento em vez da contagem de palavras.
-                Se o ângulo for zero, então o valor do cosseno chega a 1, indicando que são muito semelhantes.
-            Se a semelhança do cosseno for próxima de zero, isso indica que há menos semelhança
-            entre os documentos e os vetores do documento serão ortogonais (perpendiculares)
-            entre si. Além disso, os documentos que são diferentes entre si produzirão uma similaridade de
-            cosseno negativa. Para tais documentos, a similaridade do cosseno pode ir até -1, indicando um
-            ângulo de 1.800 entre os vetores do documento.
-            */
-
-                //Por fim, imprime os rótulos e suas pontuações de similaridade correspondentes no log.
-            /*for (Pair<String, Double> score: result) {
-                log.info("        " + score.getFirst() + ": " + score.getSecond());
-            }*/
-
             }
 
             for (int k = 0; k < mapTest.size(); k++){
@@ -271,19 +245,67 @@ public class ParagraphVectorExample {
                     String labelReal = mapReal.get(idsUnlabelledDocument.get(k));
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
 
-                    if(labelReal.equals("happy") && labelTest.equals("happy")) truePositives++;
-                    else if(labelReal.equals("happy") && labelTest.equals("sad")) falsePositives++;
-                    else if(labelReal.equals("sad") && labelTest.equals("sad")) trueNegatives++;
-                    else if(labelReal.equals("sad") && labelTest.equals("happy")) falseNegatives++;
+                    if(labelTest.equals("happy") && labelReal.equals("happy")) truePositives++;
+                    else if(labelTest.equals("sad") && labelReal.equals("sad")) trueNegatives++;
+                    else if(labelTest.equals("happy") && labelReal.equals("sad")) falsePositives++;
+                    else if(labelTest.equals("sad") && labelReal.equals("happy")) falseNegatives++;
                 }
             }
-
-            System.out.println("=====================MATRIZ DE CONFUSAO=====================");
-            System.out.println("happy          sad");
-            System.out.println(truePositives + "          " + falseNegatives);
-            System.out.println(falsePositives + "          " + trueNegatives);
         }
 
+        System.out.println("======= MATRIZ DE CONFUSÃO =======");
+        System.out.println("     happy       sad");
+        System.out.println("       "+truePositives+"          "+falseNegatives);
+        System.out.println("       "+falsePositives+"          "+trueNegatives);
+
+        metrics.setTruePositive(BigDecimal.valueOf(truePositives));
+        metrics.setTrueNegative(BigDecimal.valueOf(trueNegatives));
+        metrics.setFalsePositive(BigDecimal.valueOf(falsePositives));
+        metrics.setFalseNegative(BigDecimal.valueOf(falseNegatives));
+        metrics.setnElements(BigDecimal.valueOf(documents.size()));
+
+        System.out.println("======= MÉTRICAS DE AVALIAÇÃO =======");
+
+        if(metrics.getnElements().equals(BigDecimal.valueOf(0))){
+            System.out.println("Não foi possível calcular a métrica Accuracy!");
+        } else {
+            metrics.setAccuracy(metrics.getTruePositive().add(metrics.getTrueNegative()).divide(metrics.getnElements(), 2, BigDecimal.ROUND_HALF_UP));
+            System.out.println("Accuracy: " + metrics.getAccuracy());
+        }
+
+        if(metrics.cannotPrecision()){
+            System.out.println("Não foi possível calcular a métrica Precision!");
+        } else {
+            metrics.setPrecision(metrics.getTruePositive().divide(metrics.getTruePositive()
+                    .add(metrics.getFalsePositive()), 2, BigDecimal.ROUND_HALF_UP));
+            System.out.println("Precision: " + metrics.getPrecision());
+        }
+
+        if(metrics.cannotRecall()){
+            System.out.println("Não foi possível calcular a métrica Recall!");
+        } else {
+            metrics.setRecall(metrics.getTruePositive().divide(metrics.getTruePositive()
+                    .add(metrics.getFalseNegative()), 2, BigDecimal.ROUND_HALF_UP));
+            System.out.println("Recall: " + metrics.getRecall());
+        }
+
+        if(metrics.getPrecision().equals(BigDecimal.valueOf(0))
+                && metrics.getRecall().equals(BigDecimal.valueOf(0))){
+            System.out.println("Não foi possível calcular a métrica F1-Score!");
+        } else {
+            metrics.setF1Score(new BigDecimal(2).multiply(metrics.getPrecision().multiply(metrics.getRecall()))
+                    .divide(metrics.getPrecision().add(metrics.getRecall()), 2, BigDecimal.ROUND_HALF_UP));
+            System.out.println("F1-Score: " + metrics.getF1Score());
+        }
+
+        //BigDecimal tpRate = bigTp.divide(bigTp.add(bigFn), 2, BigDecimal.ROUND_HALF_UP);
+        //BigDecimal tnRate = bigTn.divide(bigTn.add(bigFp), 2, BigDecimal.ROUND_HALF_UP);
+        //BigDecimal fpRate = bigFp.divide(bigFp.add(bigTn), 2, BigDecimal.ROUND_HALF_UP);
+        //BigDecimal fnRate = bigFn.divide(bigFn.add(bigTp), 2, BigDecimal.ROUND_HALF_UP);
+        //System.out.println("TP Rate: " + tpRate);
+        //.out.println("TN Rate: " + tnRate);
+        //System.out.println("FP Rate: " + fpRate);
+        //System.out.println("FN Rate: " + fnRate);
     }
 
     public static void criaArquivo(LabelledDocument labelledDocument, File file){
