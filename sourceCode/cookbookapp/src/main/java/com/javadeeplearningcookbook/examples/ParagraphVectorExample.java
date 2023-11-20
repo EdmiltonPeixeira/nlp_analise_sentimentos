@@ -215,8 +215,10 @@ public class ParagraphVectorExample {
 
             paragraphVectors.fit();
 
-            for(File model : filesModel) model.delete(); //Excluindo o modelo salvo para salvar outro, como se fosse sobrescrever
-            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_RESOURCES + "/model.zip"));
+            for(File model : filesModel){
+                model.delete(); //Excluindo o modelo salvo para salvar outro, como se fosse sobrescrever
+            }
+            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_MODEL + "/model.zip"));
 
             //O `InMemoryLookupTable` é recuperado do modelo `paragraphVectors`. Esta tabela contém incorporações de palavras aprendidas durante o treinamento.
             InMemoryLookupTable<VocabWord> lookupTable = (InMemoryLookupTable<VocabWord>)paragraphVectors.getLookupTable();
