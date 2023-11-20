@@ -1,9 +1,12 @@
 package com.javadeeplearningcookbook.examples;
 
 import org.apache.arrow.flatbuf.Bool;
+import org.apache.commons.io.FileUtils;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
+import org.deeplearning4j.models.sequencevectors.iterators.AbstractSequenceIterator;
+import org.deeplearning4j.models.sequencevectors.transformers.impl.SentenceTransformer;
 import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.wordstore.VocabCache;
 import org.deeplearning4j.text.documentiterator.FileLabelAwareIterator;
@@ -30,6 +33,7 @@ import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ParagraphVectorExample {
 
@@ -40,13 +44,14 @@ public class ParagraphVectorExample {
     public static final String RESOURCE_TESTE = PATH_RESOURCES + "/teste/file";
     public static final String RESOURCE_TREINO_SAD = PATH_RESOURCES + "/treino/sad";
     public static final String RESOURCE_TREINO_HAPPY = PATH_RESOURCES + "/treino/happy";
+    public static final String PATH_MODEL = PATH_RESOURCES + "/model";
 
     public static void main(String[] args) throws IOException {
 
         //declarar os elementos da matriz de confusão
         //no início da classe principal, para gerar assim apenas
         //uma matriz de confusão, que seria a soma da matriz de cada iteração k,
-        //e também permitir o cálculo de acurácia, tpRate...
+        //e também permitir o cálculo de acurácia, precisão...
         //porque atualmente está sendo gerada uma matriz a cada iteração k
         int truePositives = 0; //previu corretamente como happy
         int falsePositives = 0; //previu incorretamente como happy
@@ -54,6 +59,8 @@ public class ParagraphVectorExample {
         int falseNegatives = 0; //previu incorretamente como sad
 
         AssessmentMetrics metrics = new AssessmentMetrics();
+
+        List<String> stopWords = FileUtils.readLines(new File(PATH_RESOURCES + "/stopwords-en.txt"), "utf-8");
 
         //Iterator modificado
         //ClassPathResource classifiedResource = new ClassPathResource("label");
@@ -167,19 +174,49 @@ public class ParagraphVectorExample {
             TokenizerFactory tokenizerFactory = new DefaultTokenizerFactory();
             tokenizerFactory.setTokenPreProcessor(new CommonPreprocessor());
 
-            //Nestas linhas, um modelo `ParagraphVectors` é construído. É configurado com vários parâmetros, como taxa de aprendizagem,
-            //tamanho do lote e o número de épocas de treinamento. Ele é treinado usando `labelAwareIterator` e `tokenizerFactory` que você criou anteriormente.
-            ParagraphVectors paragraphVectors = new ParagraphVectors.Builder()
+            File[] filesModel = new File(PATH_MODEL).listFiles();
+
+            ParagraphVectors paragraphVectors;
+
+            if(filesModel.length > 0){
+                log.info("Modelo existente! Iniciando carregamento...");
+                AtomicLong timeSpent = new AtomicLong(0);
+                timeSpent.set(System.currentTimeMillis());
+                paragraphVectors = WordVectorSerializer.readParagraphVectors(new File(PATH_MODEL + "/model.zip"));
+                paragraphVectors.setTokenizerFactory(tokenizerFactory);
+                SentenceTransformer transformer = new SentenceTransformer.Builder().iterator(treinoIterator)
+                        .tokenizerFactory(tokenizerFactory).allowMultithreading(true)
+                        .build();
+                paragraphVectors.setSequenceIterator(new AbstractSequenceIterator.Builder<>(transformer).build());
+                paragraphVectors.getConfiguration().setLearningRate(0.025);
+                paragraphVectors.getConfiguration().setMinLearningRate(0.001);
+                paragraphVectors.getConfiguration().setBatchSize(1000);
+                paragraphVectors.getConfiguration().setEpochs(100);
+                paragraphVectors.getConfiguration().setMinWordFrequency(2);
+                paragraphVectors.getConfiguration().setStopList(stopWords);
+                paragraphVectors.getConfiguration().setTrainElementsVectors(true);
+                log.info("Carregamento e ajuste de configuração concluído em {} ms", System.currentTimeMillis() - timeSpent.get());
+            } else {
+                //Nestas linhas, um modelo `ParagraphVectors` é construído. É configurado com vários parâmetros, como taxa de aprendizagem,
+                //tamanho do lote e o número de épocas de treinamento. Ele é treinado usando `labelAwareIterator` e `tokenizerFactory` que você criou anteriormente.
+                log.info("Sem modelo existente para carregamento. Iniciando configuração...");
+                paragraphVectors = new ParagraphVectors.Builder()
                         .learningRate(0.025)
                         .minLearningRate(0.001)
                         .batchSize(1000)
                         .epochs(100)
+                        .minWordFrequency(2)
                         .iterate(treinoIterator)
+                        .stopWords(stopWords)
                         .trainWordVectors(true)
                         .tokenizerFactory(tokenizerFactory)
                         .build();
+            }
 
             paragraphVectors.fit();
+
+            for(File model : filesModel) model.delete(); //Excluindo o modelo salvo para salvar outro, como se fosse sobrescrever
+            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_RESOURCES + "/model.zip"));
 
             //O `InMemoryLookupTable` é recuperado do modelo `paragraphVectors`. Esta tabela contém incorporações de palavras aprendidas durante o treinamento.
             InMemoryLookupTable<VocabWord> lookupTable = (InMemoryLookupTable<VocabWord>)paragraphVectors.getLookupTable();
@@ -289,8 +326,11 @@ public class ParagraphVectorExample {
             System.out.println("Recall: " + metrics.getRecall());
         }
 
-        if(metrics.getPrecision().equals(BigDecimal.valueOf(0))
-                && metrics.getRecall().equals(BigDecimal.valueOf(0))){
+        //Criar uma função em AssessmentMetrics para verificar se é possível
+        //calcular o F1-Score, devido o erro ao dividir por zero.
+        //As condições codificadas abaixo resolveram o problema, garantindo
+        //que não tentasse realizar o cálculo. Não estava sendo verificado o valor 0.0, somente 0.
+        if(metrics.getRecall().equals(BigDecimal.valueOf(0.00)) || metrics.getRecall().equals(BigDecimal.valueOf(0.00))){
             System.out.println("Não foi possível calcular a métrica F1-Score!");
         } else {
             metrics.setF1Score(new BigDecimal(2).multiply(metrics.getPrecision().multiply(metrics.getRecall()))
