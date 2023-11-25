@@ -1,0 +1,1 @@
+When it opens, the battery connection is broken and the device is turned off. 
