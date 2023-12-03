@@ -1,38 +1,32 @@
 package com.javadeeplearningcookbook.examples;
 
-import org.apache.arrow.flatbuf.Bool;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.Range;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
 import org.deeplearning4j.models.paragraphvectors.ParagraphVectors;
-import org.deeplearning4j.models.sequencevectors.iterators.AbstractSequenceIterator;
-import org.deeplearning4j.models.sequencevectors.transformers.impl.SentenceTransformer;
 import org.deeplearning4j.models.word2vec.VocabWord;
 import org.deeplearning4j.models.word2vec.wordstore.VocabCache;
 import org.deeplearning4j.text.documentiterator.FileLabelAwareIterator;
 import org.deeplearning4j.text.documentiterator.LabelAwareIterator;
 import org.deeplearning4j.text.documentiterator.LabelledDocument;
-import org.deeplearning4j.text.documentiterator.LabelsSource;
 import org.deeplearning4j.text.tokenization.tokenizer.preprocessor.CommonPreprocessor;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.DefaultTokenizerFactory;
 import org.deeplearning4j.text.tokenization.tokenizerfactory.TokenizerFactory;
 import org.nd4j.linalg.api.ndarray.INDArray;
 import org.nd4j.linalg.factory.Nd4j;
-import org.nd4j.linalg.io.ClassPathResource;
 import org.nd4j.linalg.ops.transforms.Transforms;
 import org.nd4j.linalg.primitives.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tartarus.snowball.ext.EnglishStemmer;
 
-import java.awt.*;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -47,17 +41,20 @@ public class ParagraphVectorExample {
     public static final String RESOURCE_TREINO_NEG = PATH_RESOURCES + "/treino/neg";
     public static final String RESOURCE_TREINO_POS = PATH_RESOURCES + "/treino/pos";
     public static final String PATH_MODEL = PATH_RESOURCES + "/model";
+    public static final String PATH_CLASSIFIED_CORRECTLY = PATH_RESOURCES + "/classified_correctly";
 
     public static void main(String[] args) throws IOException {
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+        Date hora = Calendar.getInstance().getTime(); // Ou qualquer outra forma que tem
+        String horario = sdf.format(hora);
+        log.info("Aplicação iniciada às {}", horario);
+
         AtomicLong tempoInicial = new AtomicLong(0);
         tempoInicial.set(System.currentTimeMillis());
 
-        int numFolds = 4;
+        int numFolds = 3;
 
-        int truePositives = 0; //previu corretamente como pos
-        int falsePositives = 0; //previu incorretamente como pos
-        int trueNegatives = 0; //previu corretamente como neg
-        int falseNegatives = 0; //previu incorretamente como neg
+        int countFilesCorrectly = 0;
 
         AssessmentMetrics metrics = new AssessmentMetrics();
 
@@ -84,6 +81,16 @@ public class ParagraphVectorExample {
         //Limite tamanho conjunto de dados teste
         int dadosTesteRestante = documents.size();
         int limiteDadosTeste = 0;
+
+        int countPos1 = 0;
+        int countPos2 = 0;
+        int countPos3 = 0;
+        int countPos4 = 0;
+
+        int countNeg1 = 0;
+        int countNeg2 = 0;
+        int countNeg3 = 0;
+        int countNeg4 = 0;
 
         for(int i = 0; i < numFolds; i++){
             log.info("Iniciando rodada {} de {} da validação cruzada...", i+1, numFolds);
@@ -114,6 +121,7 @@ public class ParagraphVectorExample {
             int countFileTest = 0;
             int countFileTrain = 0;
 
+            //Dividindo os arquivos conforme k-fold cross validation
             for(int j = 0; j < documents.size(); j++){
 
                 //Stemizando o texto (reduzir cada palavra a seu radical)
@@ -131,11 +139,8 @@ public class ParagraphVectorExample {
                         criaArquivo(content, arquivoTeste);
                         countFileTest++;
                     }
-                    if(documents.get(j).getLabels().get(0).equals("neg")){
-                        arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
-                    } else {
-                        arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
-                    }
+                    if(documents.get(j).getLabels().get(0).equals("neg")) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
+                    else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
                     criaArquivo(content, arquivoTreino);
                     countFileTrain++;
                 } else {
@@ -159,6 +164,7 @@ public class ParagraphVectorExample {
             Map<String, String> mapTest = new HashMap<String, String>();
             List<String> idsUnlabelledDocument = new ArrayList<>();
             List<String> idsLabelledDocument = new ArrayList<>();
+            Map<String, Double> mapSimilarity = new HashMap<String, Double>();
 
             FileLabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
                     .addSourceFolder(new File(PATH_RESOURCES + "/teste"))
@@ -183,38 +189,41 @@ public class ParagraphVectorExample {
 
             File[] filesModel = new File(PATH_MODEL).listFiles();
 
+            ParagraphVectors modelParagraphVectors = null;
             ParagraphVectors paragraphVectors;
+
+            double learning = 0.40;
+            double minLearning = 0.1;
+            int numEpochs = 400;
+            int batch = 1000;
+            int minWord = 1;
 
             if(filesModel.length > 0){
                 log.info("Modelo existente! Iniciando carregamento...");
                 AtomicLong timeSpent = new AtomicLong(0);
                 timeSpent.set(System.currentTimeMillis());
-                paragraphVectors = WordVectorSerializer.readParagraphVectors(new File(PATH_MODEL + "/model.zip"));
-                paragraphVectors.setTokenizerFactory(tokenizerFactory);
-                SentenceTransformer transformer = new SentenceTransformer.Builder().iterator(treinoIterator)
-                        .tokenizerFactory(tokenizerFactory).allowMultithreading(true)
+                modelParagraphVectors = WordVectorSerializer.readParagraphVectors(new File(PATH_MODEL + "/model.zip"));
+                paragraphVectors = new ParagraphVectors.Builder()
+                        .learningRate(learning)
+                        .minLearningRate(minLearning)
+                        .batchSize(batch)
+                        .epochs(numEpochs)
+                        .minWordFrequency(minWord)
+                        .iterate(treinoIterator)
+                        .trainWordVectors(true)
+                        .tokenizerFactory(tokenizerFactory)
+                        .useExistingWordVectors(modelParagraphVectors)
                         .build();
-                paragraphVectors.setSequenceIterator(new AbstractSequenceIterator.Builder<>(transformer).build());
-                paragraphVectors.getConfiguration().setLearningRate(0.005);
-                paragraphVectors.getConfiguration().setMinLearningRate(0.001);
-                paragraphVectors.getConfiguration().setBatchSize(1000);
-                paragraphVectors.getConfiguration().setEpochs(2);
-                paragraphVectors.getConfiguration().setMinWordFrequency(1);
-                //paragraphVectors.getConfiguration().setStopList(stopWords);
-                paragraphVectors.getConfiguration().setTrainElementsVectors(true);
-                log.info("Carregamento e ajuste de configuração concluído em {} ms", System.currentTimeMillis() - timeSpent.get());
+                log.info("Carregamento e configuração concluído em {} ms", System.currentTimeMillis() - timeSpent.get());
             } else {
-                //Nestas linhas, um modelo `ParagraphVectors` é construído. É configurado com vários parâmetros, como taxa de aprendizagem,
-                //tamanho do lote e o número de épocas de treinamento. Ele é treinado usando `labelAwareIterator` e `tokenizerFactory` que você criou anteriormente.
                 log.info("Sem modelo existente para carregamento. Iniciando configuração...");
                 paragraphVectors = new ParagraphVectors.Builder()
-                        .learningRate(0.005)
-                        .minLearningRate(0.001)
-                        .batchSize(1000)
-                        .epochs(2)
-                        .minWordFrequency(1)
+                        .learningRate(learning)
+                        .minLearningRate(minLearning)
+                        .batchSize(batch)
+                        .epochs(numEpochs)
+                        .minWordFrequency(minWord)
                         .iterate(treinoIterator)
-                        //.stopWords(stopWords)
                         .trainWordVectors(true)
                         .tokenizerFactory(tokenizerFactory)
                         .build();
@@ -280,8 +289,12 @@ public class ParagraphVectorExample {
                 //para verificar qual label de maior score do documento e atribuir ao mapTest
                 if(result.get(0).getSecond() > result.get(1).getSecond()){
                     mapTest.put(unlabelledDocument.getContent().trim().toLowerCase(), result.get(0).getFirst());
+                    //pegar a pontuação para verificar a qual subclasse pertence
+                    mapSimilarity.put(unlabelledDocument.getContent().trim().toLowerCase(), result.get(0).getSecond());
                 } else {
                     mapTest.put(unlabelledDocument.getContent().trim().toLowerCase(), result.get(1).getFirst());
+                    //pegar a pontuação para verificar a qual subclasse pertence
+                    mapSimilarity.put(unlabelledDocument.getContent().trim().toLowerCase(), result.get(1).getSecond());
                 }
 
             }
@@ -292,71 +305,81 @@ public class ParagraphVectorExample {
                 if(mapReal.containsKey(idsUnlabelledDocument.get(k))){
                     String labelReal = mapReal.get(idsUnlabelledDocument.get(k));
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
+                    Double similarity = mapSimilarity.get(idsUnlabelledDocument.get(k));
+                    String subclass = "";
 
-                    if(labelTest.equals("pos") && labelReal.equals("pos")) truePositives++;
-                    else if(labelTest.equals("neg") && labelReal.equals("neg")) trueNegatives++;
-                    else if(labelTest.equals("pos") && labelReal.equals("neg")) falsePositives++;
-                    else if(labelTest.equals("neg") && labelReal.equals("pos")) falseNegatives++;
+                    if(labelTest.equals("pos") && labelReal.equals("pos")) {
+                        if(Range.between(0.0, 0.25).contains(similarity)) {
+                            subclass = "low";
+                            countPos1++;
+                        }
+                        else if(Range.between(0.25, 0.50).contains(similarity)) {
+                            subclass = "normal";
+                            countPos2++;
+                        }
+                        else if(Range.between(0.50, 0.75).contains(similarity)) {
+                            subclass = "moderate";
+                            countPos3++;
+                        }
+                        else if(Range.between(0.75, 1.0).contains(similarity)) {
+                            subclass = "high";
+                            countPos4++;
+                        }
+                        metrics.increment("tp");
+                        countFilesCorrectly++;
+                        String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + subclass + ".txt"; //Ex.: correctly01_pos_low.txt
+                        File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
+                        criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
+                    }
+                    else if(labelTest.equals("neg") && labelReal.equals("neg")) {
+                        if(Range.between(0.0, 0.25).contains(similarity)) {
+                            subclass = "low";
+                            countNeg1++;
+                        }
+                        else if(Range.between(0.25, 0.50).contains(similarity)) {
+                            subclass = "normal";
+                            countNeg2++;
+                        }
+                        else if(Range.between(0.50, 0.75).contains(similarity)) {
+                            subclass = "moderate";
+                            countNeg3++;
+                        }
+                        else if(Range.between(0.75, 1.0).contains(similarity)) {
+                            subclass = "high";
+                            countNeg4++;
+                        }
+                        metrics.increment("tn");
+                        countFilesCorrectly++;
+                        String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + subclass + ".txt"; //Ex.: correctly03_neg_high.txt
+                        File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
+                        criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
+                    }
+                    else if(labelTest.equals("pos") && labelReal.equals("neg")) metrics.increment("fp");
+                    else if(labelTest.equals("neg") && labelReal.equals("pos")) metrics.increment("fn");
                 }
             }
         }
 
-        System.out.println("======= MATRIZ DE CONFUSÃO =======");
-        System.out.println("     pos       neg");
-        System.out.println("       "+truePositives+"          "+falseNegatives);
-        System.out.println("       "+falsePositives+"          "+trueNegatives);
-
-        metrics.setTruePositive(BigDecimal.valueOf(truePositives));
-        metrics.setTrueNegative(BigDecimal.valueOf(trueNegatives));
-        metrics.setFalsePositive(BigDecimal.valueOf(falsePositives));
-        metrics.setFalseNegative(BigDecimal.valueOf(falseNegatives));
         metrics.setnElements(BigDecimal.valueOf(documents.size()));
+        metrics.generateMatrix();
+        System.out.println("Foram classificados corretamente: ");
+        System.out.println(countPos1 + " documentos 'pos' na subclasse 1 - low.");
+        System.out.println(countPos2 + " documentos 'pos' na subclasse 2 - normal.");
+        System.out.println(countPos3 + " documentos 'pos' na subclasse 3 - moderate.");
+        System.out.println(countPos4 + " documentos 'pos' na subclasse 4 - high.");
 
-        System.out.println("======= MÉTRICAS DE AVALIAÇÃO =======");
+        System.out.println(countPos1 + " documentos 'neg' na subclasse 1 - low.");
+        System.out.println(countPos2 + " documentos 'neg' na subclasse 2 - normal.");
+        System.out.println(countPos3 + " documentos 'neg' na subclasse 3 - moderate.");
+        System.out.println(countPos4 + " documentos 'neg' na subclasse 4 - high.");
 
-        if(metrics.getnElements().equals(BigDecimal.valueOf(0))){
-            System.out.println("Não foi possível calcular a métrica Accuracy!");
-        } else {
-            metrics.setAccuracy(metrics.getTruePositive().add(metrics.getTrueNegative()).divide(metrics.getnElements(), 4, BigDecimal.ROUND_HALF_UP));
-            System.out.println("Accuracy: " + metrics.getAccuracy());
-        }
+        metrics.generateEvaluationMetrics();
 
-        if(metrics.cannotPrecision()){
-            System.out.println("Não foi possível calcular a métrica Precision!");
-        } else {
-            metrics.setPrecision(metrics.getTruePositive().divide(metrics.getTruePositive()
-                    .add(metrics.getFalsePositive()), 4, BigDecimal.ROUND_HALF_UP));
-            System.out.println("Precision: " + metrics.getPrecision());
-        }
+        SimpleDateFormat sdfFinal = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+        Date horaFinal = Calendar.getInstance().getTime(); // Ou qualquer outra forma que tem
+        String horarioFinal = sdfFinal.format(horaFinal);
+        log.info("Execução concluída às {}", horarioFinal);
 
-        if(metrics.cannotRecall()){
-            System.out.println("Não foi possível calcular a métrica Recall!");
-        } else {
-            metrics.setRecall(metrics.getTruePositive().divide(metrics.getTruePositive()
-                    .add(metrics.getFalseNegative()), 4, BigDecimal.ROUND_HALF_UP));
-            System.out.println("Recall: " + metrics.getRecall());
-        }
-
-        //Criar uma função em AssessmentMetrics para verificar se é possível
-        //calcular o F1-Score, devido o erro ao dividir por zero.
-        //As condições codificadas abaixo resolveram o problema, garantindo
-        //que não tentasse realizar o cálculo. Não estava sendo verificado o valor 0.0, somente 0.
-        if(metrics.getRecall().equals(BigDecimal.valueOf(0.0000)) || metrics.getRecall().equals(BigDecimal.valueOf(0.0000))){
-            System.out.println("Não foi possível calcular a métrica F1-Score!");
-        } else {
-            metrics.setF1Score(new BigDecimal(2).multiply(metrics.getPrecision().multiply(metrics.getRecall()))
-                    .divide(metrics.getPrecision().add(metrics.getRecall()), 4, BigDecimal.ROUND_HALF_UP));
-            System.out.println("F1-Score: " + metrics.getF1Score());
-        }
-
-        //BigDecimal tpRate = bigTp.divide(bigTp.add(bigFn), 2, BigDecimal.ROUND_HALF_UP);
-        //BigDecimal tnRate = bigTn.divide(bigTn.add(bigFp), 2, BigDecimal.ROUND_HALF_UP);
-        //BigDecimal fpRate = bigFp.divide(bigFp.add(bigTn), 2, BigDecimal.ROUND_HALF_UP);
-        //BigDecimal fnRate = bigFn.divide(bigFn.add(bigTp), 2, BigDecimal.ROUND_HALF_UP);
-        //System.out.println("TP Rate: " + tpRate);
-        //.out.println("TN Rate: " + tnRate);
-        //System.out.println("FP Rate: " + fpRate);
-        //System.out.println("FN Rate: " + fnRate);
         AtomicLong tempoTotal = new AtomicLong(0);
         tempoTotal.set(System.currentTimeMillis() - tempoInicial.get());
 
@@ -383,7 +406,7 @@ public class ParagraphVectorExample {
     }
 
     public static String stemmingText(String text){
-        String[] words = text.split("//s+");
+        String[] words = text.split("\\s+");
         EnglishStemmer englishStemmer = new EnglishStemmer();
         StringBuilder stemmedText = new StringBuilder();
 
