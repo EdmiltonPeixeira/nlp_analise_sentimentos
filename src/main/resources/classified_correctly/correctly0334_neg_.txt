@@ -1,0 +1,1 @@
+i put the latest os on it (v1.15g), and it now likes to slow to a crawl and lock up every once in a while.

@@ -1,0 +1,1 @@
+it looses connection to the phone even when it is within a couple feet between the two.
