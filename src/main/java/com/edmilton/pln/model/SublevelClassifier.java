@@ -20,6 +20,10 @@ public class SublevelClassifier {
     private Map<Integer, Sublevel> mapClassifier3 = new HashMap<>();
     private Map<Integer, Sublevel> mapClassifier4 = new HashMap<>();
 
+    public SublevelClassifier (Level level) {
+        this.level = level;
+    }
+
     public Level getLevel() {
         return level;
     }

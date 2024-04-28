@@ -1,6 +1,7 @@
 package com.edmilton.pln;
 
 import com.edmilton.pln.model.AssessmentMetrics;
+import com.edmilton.pln.model.SublevelClassifier;
 import org.apache.commons.lang3.Range;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
@@ -309,49 +310,22 @@ public class ParagraphVectorExample {
                     String labelReal = mapReal.get(idsUnlabelledDocument.get(k));
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
                     Double similarity = mapSimilarity.get(idsUnlabelledDocument.get(k));
-                    String subclass = "";
+                    SublevelClassifier classifierPos = new SublevelClassifier(Level.POS);
+                    SublevelClassifier classifierNeg = new SublevelClassifier(Level.NEG);
 
                     if(labelTest.equals("pos") && labelReal.equals("pos")) {
-                        if(Range.between(0.0, 0.25).contains(similarity)) {
-                            subclass = "low";
-                            countPos1++;
-                        } else if(Range.between(0.25, 0.50).contains(similarity)) {
-                            subclass = "normal";
-                            countPos2++;
-                        } else if(Range.between(0.50, 0.75).contains(similarity)) {
-                            subclass = "moderate";
-                            countPos3++;
-                        } else if(Range.between(0.75, 1.0).contains(similarity)) {
-                            subclass = "high";
-                            countPos4++;
-                        }
+                        classifierPos.classify(similarity);
                         metrics.increment("tp");
-                        countFilesCorrectly++;
-                        String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + subclass + ".txt"; //Ex.: correctly01_pos_low.txt
-                        File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
-                        criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
                     }
                     else if(labelTest.equals("neg") && labelReal.equals("neg")) {
-                        if(Range.between(0.0, 0.25).contains(similarity)) {
-                            subclass = "low";
-                            countNeg1++;
-                        } else if(Range.between(0.25, 0.50).contains(similarity)) {
-                            subclass = "normal";
-                            countNeg2++;
-                        } else if(Range.between(0.50, 0.75).contains(similarity)) {
-                            subclass = "moderate";
-                            countNeg3++;
-                        } else if(Range.between(0.75, 1.0).contains(similarity)) {
-                            subclass = "high";
-                            countNeg4++;
-                        }
+                        classifierNeg.classify(similarity);
                         metrics.increment("tn");
-                        countFilesCorrectly++;
-                        String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + subclass + ".txt"; //Ex.: correctly03_neg_high.txt
-                        File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
-                        criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
                     }
-                    else if(labelTest.equals("pos") && labelReal.equals("neg")) metrics.increment("fp");
+                    countFilesCorrectly++;
+                    String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + similarity.toString().replace('.', '-') + ".txt"; //Ex.: correctly03_neg_0-65.txt
+                    File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
+                    criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
+                    if(labelTest.equals("pos") && labelReal.equals("neg")) metrics.increment("fp");
                     else if(labelTest.equals("neg") && labelReal.equals("pos")) metrics.increment("fn");
                 }
             }
