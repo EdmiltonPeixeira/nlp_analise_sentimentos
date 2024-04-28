@@ -70,4 +70,17 @@ public class SublevelClassifier {
             mapClassifier1.put(sub4, Sublevel.HIGH);
         }
     }
+
+    private void exibir(Map<Integer, Sublevel> map){
+        for(Map.Entry<Integer, Sublevel> entry : map.entrySet()){
+            System.out.println(entry.getKey() + ":" + entry.getValue() + "| Level " + this.level);
+        }
+    }
+
+    public void exibirClassificacao(){
+        this.exibir(mapClassifier1);
+        this.exibir(mapClassifier2);
+        this.exibir(mapClassifier3);
+        this.exibir(mapClassifier4);
+    }
 }

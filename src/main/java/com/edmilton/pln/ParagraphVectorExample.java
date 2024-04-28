@@ -85,15 +85,8 @@ public class ParagraphVectorExample {
         int dadosTesteRestante = documents.size();
         int limiteDadosTeste = 0;
 
-        int countPos1 = 0;
-        int countPos2 = 0;
-        int countPos3 = 0;
-        int countPos4 = 0;
-
-        int countNeg1 = 0;
-        int countNeg2 = 0;
-        int countNeg3 = 0;
-        int countNeg4 = 0;
+        SublevelClassifier classifierPos = new SublevelClassifier(Level.POS);
+        SublevelClassifier classifierNeg = new SublevelClassifier(Level.NEG);
 
         for(int i = 0; i < numFolds; i++){
             log.info("Iniciando rodada {} de {} da validação cruzada...", i+1, numFolds);
@@ -310,8 +303,6 @@ public class ParagraphVectorExample {
                     String labelReal = mapReal.get(idsUnlabelledDocument.get(k));
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
                     Double similarity = mapSimilarity.get(idsUnlabelledDocument.get(k));
-                    SublevelClassifier classifierPos = new SublevelClassifier(Level.POS);
-                    SublevelClassifier classifierNeg = new SublevelClassifier(Level.NEG);
 
                     if(labelTest.equals("pos") && labelReal.equals("pos")) {
                         classifierPos.classify(similarity);
@@ -333,16 +324,9 @@ public class ParagraphVectorExample {
 
         metrics.setnElements(BigDecimal.valueOf(documents.size()));
         metrics.generateMatrix();
-        System.out.println("Foram classificados corretamente: ");
-        System.out.println(countPos1 + " documentos 'pos' na subclasse 1 - low.");
-        System.out.println(countPos2 + " documentos 'pos' na subclasse 2 - normal.");
-        System.out.println(countPos3 + " documentos 'pos' na subclasse 3 - moderate.");
-        System.out.println(countPos4 + " documentos 'pos' na subclasse 4 - high.");
-
-        System.out.println(countNeg1 + " documentos 'neg' na subclasse 1 - low.");
-        System.out.println(countNeg2 + " documentos 'neg' na subclasse 2 - normal.");
-        System.out.println(countNeg3 + " documentos 'neg' na subclasse 3 - moderate.");
-        System.out.println(countNeg4 + " documentos 'neg' na subclasse 4 - high.");
+        System.out.println("Classificados corretamente: ");
+        classifierPos.exibirClassificacao();
+        classifierNeg.exibirClassificacao();
 
         metrics.generateEvaluationMetrics();
 
@@ -373,26 +357,6 @@ public class ParagraphVectorExample {
             //log.info("Arquivo " + file.getName() + " criado com sucesso.");
         } catch (IOException e){
             e.printStackTrace();
-        }
-    }
-
-    public static void countSubClasses(int a, int b, int c, int d, Double similarity, String sub){
-        int c1 = a;
-        int c2 = b;
-        int c3 = c;
-        int c4 = d;
-        if(Range.between(0.0, 0.25).contains(similarity)) {
-            sub = "low";
-            a++;
-        } else if(Range.between(0.25, 0.50).contains(similarity)) {
-            sub = "normal";
-            b++;
-        } else if(Range.between(0.50, 0.75).contains(similarity)) {
-            sub = "moderate";
-            c++;
-        } else if(Range.between(0.75, 1.0).contains(similarity)) {
-            sub = "high";
-            d++;
         }
     }
 
