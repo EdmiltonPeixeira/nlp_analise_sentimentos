@@ -1,6 +1,6 @@
 package com.edmilton.pln;
 
-import org.apache.commons.io.FileUtils;
+import com.edmilton.pln.model.AssessmentMetrics;
 import org.apache.commons.lang3.Range;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
 import org.deeplearning4j.models.embeddings.loader.WordVectorSerializer;
@@ -30,6 +30,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+
+import com.edmilton.pln.enums.*;
 
 public class ParagraphVectorExample {
 
@@ -139,7 +141,7 @@ public class ParagraphVectorExample {
                         criaArquivo(content, arquivoTeste);
                         countFileTest++;
                     }
-                    if(documents.get(j).getLabels().get(0).equals("neg")) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
+                    if(documents.get(j).getLabels().get(0).equals(Level.NEG.toString())) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
                     else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
                     criaArquivo(content, arquivoTreino);
                     countFileTrain++;
@@ -189,12 +191,13 @@ public class ParagraphVectorExample {
 
             File[] filesModel = new File(PATH_MODEL).listFiles();
 
+
             ParagraphVectors modelParagraphVectors = null;
             ParagraphVectors paragraphVectors;
 
-            double learning = 0.40;
+            double learning = 0.20;
             double minLearning = 0.1;
-            int numEpochs = 2;
+            int numEpochs = 200;
             int batch = 1000;
             int minWord = 1;
 
@@ -235,7 +238,7 @@ public class ParagraphVectorExample {
             for(File model : filesModel){
                 model.delete(); //Excluindo o modelo salvo para salvar outro, como se fosse sobrescrever
             }
-            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_MODEL + "/model.zip"));
+            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_MODEL + "/model_" + numFolds + "folds.zip"));
             log.info("Modelo salvo com sucesso!");
 
             //O `InMemoryLookupTable` é recuperado do modelo `paragraphVectors`. Esta tabela contém incorporações de palavras aprendidas durante o treinamento.
@@ -400,6 +403,10 @@ public class ParagraphVectorExample {
     }
 
     public static void countSubClasses(int a, int b, int c, int d, Double similarity, String sub){
+        int c1 = a;
+        int c2 = b;
+        int c3 = c;
+        int c4 = d;
         if(Range.between(0.0, 0.25).contains(similarity)) {
             sub = "low";
             a++;

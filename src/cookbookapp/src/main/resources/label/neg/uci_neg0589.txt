@@ -1,1 +1,0 @@
-I recently had problems where I could not stay connected for more than 10 minutes before being disconnected.
