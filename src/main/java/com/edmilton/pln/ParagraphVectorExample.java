@@ -191,7 +191,7 @@ public class ParagraphVectorExample {
 
             double learning = 0.20;
             double minLearning = 0.1;
-            int numEpochs = 200;
+            int numEpochs = 2;
             int batch = 1000;
             int minWord = 1;
 
@@ -232,7 +232,7 @@ public class ParagraphVectorExample {
             for(File model : filesModel){
                 model.delete(); //Excluindo o modelo salvo para salvar outro, como se fosse sobrescrever
             }
-            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_MODEL + "/model_" + numFolds + "folds.zip"));
+            WordVectorSerializer.writeParagraphVectors(paragraphVectors, new File(PATH_MODEL + "/model.zip"));
             log.info("Modelo salvo com sucesso!");
 
             //O `InMemoryLookupTable` é recuperado do modelo `paragraphVectors`. Esta tabela contém incorporações de palavras aprendidas durante o treinamento.
@@ -278,7 +278,7 @@ public class ParagraphVectorExample {
                         throw new IllegalStateException("Label '"+ label+"' has no known vector!");
                     }
                     double sim = Transforms.cosineSim(documentVector, vecLabel);
-                    result.add(new Pair<String, Double>(label, sim));
+                    result.add(new Pair<String, Double>(label.toUpperCase(), sim));
                 }
 
                 //Aqui devo pegar a chave do mapTest de unlabelledDocument.hashCode()
@@ -304,11 +304,11 @@ public class ParagraphVectorExample {
                     String labelTest = mapTest.get(idsUnlabelledDocument.get(k));
                     Double similarity = mapSimilarity.get(idsUnlabelledDocument.get(k));
 
-                    if(labelTest.equals("pos") && labelReal.equals("pos")) {
+                    if(labelTest.equals(Level.POS.toString()) && labelReal.equals(Level.POS.toString())) {
                         classifierPos.classify(similarity);
                         metrics.increment("tp");
                     }
-                    else if(labelTest.equals("neg") && labelReal.equals("neg")) {
+                    else if(labelTest.equals(Level.NEG.toString()) && labelReal.equals(Level.NEG.toString())) {
                         classifierNeg.classify(similarity);
                         metrics.increment("tn");
                     }
@@ -316,8 +316,8 @@ public class ParagraphVectorExample {
                     String nameFile = "correctly0" + countFilesCorrectly + "_" + labelTest + "_" + similarity.toString().replace('.', '-') + ".txt"; //Ex.: correctly03_neg_0-65.txt
                     File fileCorrectly = new File(new File(PATH_CLASSIFIED_CORRECTLY), nameFile);
                     criaArquivo(idsUnlabelledDocument.get(k), fileCorrectly);
-                    if(labelTest.equals("pos") && labelReal.equals("neg")) metrics.increment("fp");
-                    else if(labelTest.equals("neg") && labelReal.equals("pos")) metrics.increment("fn");
+                    if(labelTest.equals(Level.POS.toString()) && labelReal.equals(Level.NEG.toString())) metrics.increment("fp");
+                    else if(labelTest.equals(Level.NEG.toString()) && labelReal.equals(Level.POS.toString())) metrics.increment("fn");
                 }
             }
         }
