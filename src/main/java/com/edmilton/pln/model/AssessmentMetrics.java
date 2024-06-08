@@ -209,6 +209,7 @@ public class AssessmentMetrics {
             setF1Score(new BigDecimal(2).multiply(precision.multiply(recall))
                     .divide(precision.add(recall), 4, BigDecimal.ROUND_HALF_UP));
             System.out.println("F1-Score: " + f1Score);
+            System.out.println();
         }
     }
 

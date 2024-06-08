@@ -1,1 +1,0 @@
-adapter does not provide enough charging current.

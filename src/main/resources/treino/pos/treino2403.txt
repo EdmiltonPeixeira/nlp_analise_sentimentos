@@ -1,1 +1,0 @@
-Gets a signal when other Verizon phones won't. 

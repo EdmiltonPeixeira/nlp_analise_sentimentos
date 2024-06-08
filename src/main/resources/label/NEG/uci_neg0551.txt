@@ -1,1 +1,0 @@
-That's a huge design flaw (unless I'm not using it correctly, which I don't think is the case).

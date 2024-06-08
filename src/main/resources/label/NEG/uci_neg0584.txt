@@ -1,1 +1,0 @@
-It only recognizes the Phone as its storage device.
