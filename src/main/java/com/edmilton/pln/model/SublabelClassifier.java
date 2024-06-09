@@ -2,7 +2,6 @@ package com.edmilton.pln.model;
 
 import com.edmilton.pln.enums.Label;
 import com.edmilton.pln.enums.Sublabel;
-import org.apache.commons.lang3.Range;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -1,7 +1,5 @@
 package com.edmilton.pln;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.Range;
 import com.edmilton.pln.model.AssessmentMetrics;
 import com.edmilton.pln.model.SublabelClassifier;
 import org.deeplearning4j.models.embeddings.inmemory.InMemoryLookupTable;
@@ -107,15 +105,16 @@ public class ParagraphVectorExample {
         File[] arquivosTeste = diretorioTeste.listFiles(); //possiveis arquivos na pasta /resources/teste
         File[] arquivosTreinoNeg = diretorioTreinoNeg.listFiles(); //possiveis arquivos na pasta /resources/treino/neg
         File[] arquivosTreinoPos = diretorioTreinoPos.listFiles(); //possiveis arquivos na pasta /resources/treino/pos
-        if(arquivosTeste.length > 0) {
-            for(File file : arquivosTeste) file.delete();
+
+        if(arquivosTeste != null){
+            for (File file : arquivosTeste) file.delete();
         }
 
-        if(arquivosTreinoNeg.length > 0) {
+        if(arquivosTreinoNeg != null) {
             for(File file : arquivosTreinoNeg) file.delete();
         }
 
-        if(arquivosTreinoPos.length > 0) {
+        if(arquivosTreinoPos != null) {
             for(File file : arquivosTreinoPos) file.delete();
         }
 
@@ -179,11 +178,11 @@ public class ParagraphVectorExample {
 
         log.info("Foram criados {} arquivos de teste e {} arquivos de treino.", contArquivosTeste, contArquivosTreino);
 
-        Map<String, String> mapReal = new HashMap<String, String>();
-        Map<String, String> mapTest = new HashMap<String, String>();
+        Map<String, String> mapReal = new HashMap<>();
+        Map<String, String> mapTest = new HashMap<>();
         List<String> idsUnlabelledDocument = new ArrayList<>();
         List<String> idsLabelledDocument = new ArrayList<>();
-        Map<String, Double> mapSimilarity = new HashMap<String, Double>();
+        Map<String, Double> mapSimilarity = new HashMap<>();
 
         FileLabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
                 .addSourceFolder(new File(PATH_RESOURCES + "/teste"))
@@ -301,7 +300,7 @@ public class ParagraphVectorExample {
                     throw new IllegalStateException("Label '"+ label+"' has no known vector!");
                 }
                 double sim = Transforms.cosineSim(documentVector, vecLabel);
-                result.add(new Pair<String, Double>(label.toUpperCase(), sim));
+                result.add(new Pair<>(label.toUpperCase(), sim));
             }
 
             //Aqui devo pegar a chave do mapTest de unlabelledDocument.hashCode()
