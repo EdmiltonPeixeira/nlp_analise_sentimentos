@@ -93,8 +93,11 @@ public class ParagraphVectorExample {
         int qtdArquivosTreino = 0;
         int qtdArquivosTeste = 0;
 
+
         //for(int i = 0; i < numFolds; i++){
         log.info("Iniciando execução...");
+        qtdArquivosTreino = (int) Math.round(documents.size() * percentTreino);
+        qtdArquivosTeste = documents.size() - qtdArquivosTreino;
 
             /*if(i == numFolds - 1) limiteDadosTeste = dadosTesteRestante;
             else limiteDadosTeste = documents.size() / numFolds;
@@ -119,8 +122,8 @@ public class ParagraphVectorExample {
         File arquivoTeste = null;
         File arquivoTreino = null;
 
-        int countFileTest = 0;
-        int countFileTrain = 0;
+        int contArquivosTeste = 0;
+        int contArquivosTreino = 0;
 
         //Dividindo os arquivos em subconjuntos de treino e teste
         for(int j = 0; j < documents.size(); j++){
@@ -134,32 +137,47 @@ public class ParagraphVectorExample {
 
             //Na primeira rodada, todos os arquivos são considerados para treino
             //A partir da segunda rodada é feita a divisão
+            //i=0 significa a 1a rodada (da tentativa de implementar k-fold cross validation)
+            //que portanto sempre criava arquivo de treino (qtdArquivosTreino = totalArquivos na 1a rodada)
+            //e criava arquivos de teste apenas num total de totalArquivos / k
             //if(i == 0){
                     /*if(diretorioTeste.listFiles().length < limiteDadosTeste){
                         arquivoTeste = new File(diretorioTeste, nomeArquivoTeste);
                         criaArquivo(content, arquivoTeste);
-                        countFileTest++;
+                        contArquivosTeste++;
                     }
                     if(documents.get(j).getLabels().get(0).equals(Label.NEG.toString())) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
                     else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
                     criaArquivo(content, arquivoTreino);
-                    countFileTrain++;
+                    contArquivosTreino++;
                 //} else {
                     if(!listaArquivosTestados.contains(nomeArquivoTeste) && diretorioTeste.listFiles().length < limiteDadosTeste){
                         arquivoTeste = new File(diretorioTeste, nomeArquivoTeste); //arquivo de teste atual
                         listaArquivosTestados.add(arquivoTeste.getName());
                         criaArquivo(content, arquivoTeste);
-                        countFileTest++;
+                        contArquivosTeste++;
                     } else {
                         if (documents.get(j).getLabels().get(0).equals("neg")) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
                         else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
                         criaArquivo(content, arquivoTreino);
-                        countFileTrain++;
+                        contArquivosTreino++;
                     }*/
             //}
+
+            if(!listaArquivosTestados.contains(nomeArquivoTeste) && diretorioTeste.listFiles().length < qtdArquivosTeste){
+                arquivoTeste = new File(diretorioTeste, nomeArquivoTeste); //arquivo de teste atual
+                listaArquivosTestados.add(arquivoTeste.getName());
+                criaArquivo(content, arquivoTeste);
+                contArquivosTeste++;
+            } else {
+                if (documents.get(j).getLabels().get(0).equals(Label.NEG.toString())) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
+                else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
+                criaArquivo(content, arquivoTreino);
+                contArquivosTreino++;
+            }
         }
 
-        log.info("Foram criados {} arquivos de teste e {} arquivos de treino.", countFileTest, countFileTrain);
+        log.info("Foram criados {} arquivos de teste e {} arquivos de treino.", contArquivosTeste, contArquivosTreino);
 
         Map<String, String> mapReal = new HashMap<String, String>();
         Map<String, String> mapTest = new HashMap<String, String>();
