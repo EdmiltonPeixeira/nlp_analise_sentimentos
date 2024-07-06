@@ -40,8 +40,8 @@ public class ParagraphVectorExample {
     public static final String PATH_RESOURCES  = RAIZ + "/nlp_analise_sentimentos/sourceCode/cookbookapp/src/main/resources";
     public static final String PATH_LABEL = RAIZ + "/label";
     public static final String DIR_TESTE = RAIZ + "/teste/files";
-    public static final String DIR_TREINO_NEG = RAIZ + "/treino/label/NEG";
-    public static final String DIR_TREINO_POS = RAIZ + "/treino/label/POS";
+    public static final String DIR_TREINO_NEG = RAIZ + "/treino/NEG";
+    public static final String DIR_TREINO_POS = RAIZ + "/treino/POS";
     public static final String PATH_MODEL = RAIZ + "/modelos";
     public static final String DIR_CLASSIFICADOS_CORRETAMENTE = RAIZ + "/cc";
 
@@ -68,16 +68,19 @@ public class ParagraphVectorExample {
                 .addSourceFolder(new File(PATH_LABEL))
                 .build();
 
-        List<LabelledDocument> documents = new ArrayList<>();
+        //Alterando arraylist para hashset para preservar integridade dos dados,
+        //ou seja, evitar a duplicidade
+        HashSet<LabelledDocument> documentsHashSet = new HashSet<>();
         while(labelAwareIterator.hasNextDocument()){
-            documents.add(labelAwareIterator.nextDocument());
+            documentsHashSet.add(labelAwareIterator.nextDocument());
         }
 
         File diretorioTeste = new File(DIR_TESTE);
         File diretorioTreinoNeg = new File(DIR_TREINO_NEG);
         File diretorioTreinoPos = new File(DIR_TREINO_POS);
 
-        List<String> listaArquivosTestados = new ArrayList<>();
+        List<String> nomesArquivosTeste = new ArrayList<>();
+        List<Integer> indicesArquivosTeste = new ArrayList<>();
 
         //Depois de copiar os arquivos e separá-los em novos diretórios,
         //é necessário criar outro iterator apenas do novo diretório de arquivo de treino
@@ -94,8 +97,8 @@ public class ParagraphVectorExample {
 
         //for(int i = 0; i < numFolds; i++){
         log.info("Iniciando execução...");
-        qtdArquivosTreino = (int) Math.round(documents.size() * percentTreino);
-        qtdArquivosTeste = documents.size() - qtdArquivosTreino;
+        qtdArquivosTreino = (int) Math.round(documentsHashSet.size() * percentTreino);
+        qtdArquivosTeste = documentsHashSet.size() - qtdArquivosTreino;
 
             /*if(i == numFolds - 1) limiteDadosTeste = dadosTesteRestante;
             else limiteDadosTeste = documents.size() / numFolds;
@@ -124,12 +127,39 @@ public class ParagraphVectorExample {
         int contArquivosTeste = 0;
         int contArquivosTreino = 0;
 
+        //Transformando hashset em arraylist
+        List<LabelledDocument> documentsArrayList = new ArrayList<>(documentsHashSet);
+
+        if(documentsArrayList.size() != documentsArrayList.stream().distinct().count()){
+            log.info("ATENÇÃO!!!!! Elementos duplicados no arrayList");
+        } else {
+            log.info("UFAAA!!! Não há elementos duplicados no arrayList");
+        }
+
         //Dividindo os arquivos em subconjuntos de treino e teste
-        for(int j = 0; j < documents.size(); j++){
+        for(int j = 0; j < documentsArrayList.size(); j++){
 
             //Stemizando o texto (reduzir cada palavra a seu radical)
             //String content = stemmingText(documents.get(j).getContent());
-            String content = documents.get(j).getContent();
+            Random rand = new Random();
+            int min = 0;
+            int max = documentsArrayList.size() - 1;
+            int indice = rand.nextInt((max - min) + 1) + min;
+            String conteudoTeste = null;
+            String conteudoTreino = documentsArrayList.get(j).getContent();
+
+            //Verificar se a lista de indices de teste contém o indice gerado aleatoriamente
+            //e realizar os demais procedimentos
+
+            while(true){
+                if(!indicesArquivosTeste.isEmpty() && indicesArquivosTeste.contains(indice)){
+                    indice = rand.nextInt((max - min) + 1) + min;
+                } else {
+                    break;
+                }
+            }
+
+            conteudoTeste = documentsArrayList.get(indice).getContent();
 
             String nomeArquivoTeste = "teste"+j+".txt";
             String nomeArquivoTreino = "treino"+j+".txt";
@@ -150,9 +180,9 @@ public class ParagraphVectorExample {
                     criaArquivo(content, arquivoTreino);
                     contArquivosTreino++;
                 //} else {
-                    if(!listaArquivosTestados.contains(nomeArquivoTeste) && diretorioTeste.listFiles().length < limiteDadosTeste){
+                    if(!nomesArquivosTeste.contains(nomeArquivoTeste) && diretorioTeste.listFiles().length < limiteDadosTeste){
                         arquivoTeste = new File(diretorioTeste, nomeArquivoTeste); //arquivo de teste atual
-                        listaArquivosTestados.add(arquivoTeste.getName());
+                        nomesArquivosTeste.add(arquivoTeste.getName());
                         criaArquivo(content, arquivoTeste);
                         contArquivosTeste++;
                     } else {
@@ -163,36 +193,42 @@ public class ParagraphVectorExample {
                     }*/
             //}
 
-            if(!listaArquivosTestados.contains(nomeArquivoTeste) && diretorioTeste.listFiles().length < qtdArquivosTeste){
+            if(!nomesArquivosTeste.contains(nomeArquivoTeste) && Objects.requireNonNull(diretorioTeste.listFiles()).length < qtdArquivosTeste){
                 arquivoTeste = new File(diretorioTeste, nomeArquivoTeste); //arquivo de teste atual
-                listaArquivosTestados.add(arquivoTeste.getName());
-                criaArquivo(content, arquivoTeste);
+                nomesArquivosTeste.add(arquivoTeste.getName());
+                criaArquivo(conteudoTeste, arquivoTeste);
                 contArquivosTeste++;
             } else {
-                if (documents.get(j).getLabels().get(0).equals(Label.NEG.toString())) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
+                if (documentsArrayList.get(j).getLabels().get(0).equals(Label.NEG.toString())) arquivoTreino = new File(diretorioTreinoNeg, nomeArquivoTreino);
                 else arquivoTreino = new File(diretorioTreinoPos, nomeArquivoTreino);
-                criaArquivo(content, arquivoTreino);
+                criaArquivo(conteudoTreino, arquivoTreino);
                 contArquivosTreino++;
             }
+        }
+
+        if(contArquivosTeste == qtdArquivosTeste){
+            log.info("Contador de arquivos teste é IGUAL a quantidade arquivos teste definida pelo percentual");
+        } else {
+            log.info("Contador de arquivos teste é DIFERENTE a quantidade arquivos teste definida pelo percentual");
         }
 
         log.info("Foram criados {} arquivos de teste e {} arquivos de treino.", contArquivosTeste, contArquivosTreino);
 
         Map<String, String> mapReal = new HashMap<>();
         Map<String, String> mapTest = new HashMap<>();
-        List<String> idsUnlabelledDocument = new ArrayList<>();
+        ArrayList<String> idsUnlabelledDocument = new ArrayList<>();
         List<String> idsLabelledDocument = new ArrayList<>();
         Map<String, Double> mapSimilarity = new HashMap<>();
 
         FileLabelAwareIterator testeIterator = new FileLabelAwareIterator.Builder()
-                .addSourceFolder(new File(PATH_RESOURCES + "/teste"))
+                .addSourceFolder(new File(RAIZ + "/teste"))
                 .build();
 
         FileLabelAwareIterator treinoIterator = new FileLabelAwareIterator.Builder()
-                .addSourceFolder(new File(PATH_RESOURCES + "/treino"))
+                .addSourceFolder(new File(RAIZ + "/treino"))
                 .build();
 
-        for (LabelledDocument real : documents){
+        for (LabelledDocument real : documentsArrayList){
             String id = real.getContent().trim().toLowerCase();
             String label = real.getLabels().get(0);
 
@@ -207,7 +243,6 @@ public class ParagraphVectorExample {
 
         File[] filesModel = new File(PATH_MODEL).listFiles();
 
-
         ParagraphVectors modelParagraphVectors = null;
         ParagraphVectors paragraphVectors;
 
@@ -217,7 +252,7 @@ public class ParagraphVectorExample {
         int batch = 1000;
         int minWord = 1;
 
-        if(filesModel.length > 0){
+        /*if(filesModel.length > 0){
             log.info("Modelo existente! Iniciando carregamento...");
             AtomicLong timeSpent = new AtomicLong(0);
             timeSpent.set(System.currentTimeMillis());
@@ -234,8 +269,8 @@ public class ParagraphVectorExample {
                     .useExistingWordVectors(modelParagraphVectors)
                     .build();
             log.info("Carregamento e configuração concluído em {} ms", System.currentTimeMillis() - timeSpent.get());
-        } else {
-            log.info("Sem modelo existente para carregamento. Iniciando configuração...");
+        } else {*/
+            log.info("Iniciando configuração...");
             paragraphVectors = new ParagraphVectors.Builder()
                     .learningRate(learning)
                     .minLearningRate(minLearning)
@@ -247,7 +282,7 @@ public class ParagraphVectorExample {
                     .tokenizerFactory(tokenizerFactory)
                     .build();
             log.info("Configuração concluída!");
-        }
+        //}
 
         paragraphVectors.fit();
 
@@ -308,6 +343,9 @@ public class ParagraphVectorExample {
             //para verificar qual label de maior score do documento e atribuir ao mapTest
             Double s1 = Math.abs(result.get(0).getSecond());
             Double s2 = Math.abs(result.get(1).getSecond());
+            if(mapTest.containsKey(unlabelledDocument.getContent().trim().toLowerCase())){
+                mapReal.remove(unlabelledDocument.getContent().trim().toLowerCase());
+            }
             if(s1 > s2){
                 mapTest.put(unlabelledDocument.getContent().trim().toLowerCase(), result.get(0).getFirst());
                 //pegar a pontuação para verificar a qual subclasse pertence
@@ -345,7 +383,7 @@ public class ParagraphVectorExample {
             }
         }
 
-        metrics.setnElements(BigDecimal.valueOf(documents.size()));
+        metrics.setnElements(BigDecimal.valueOf(qtdArquivosTeste));
         metrics.generateMatrix();
 
         metrics.generateEvaluationMetrics();
